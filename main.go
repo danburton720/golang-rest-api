@@ -9,24 +9,62 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type Article struct {
-	Title   string `json:"Title"`
-	Desc    string `json:"desc"`
-	Content string `json:"content"`
+type Album struct {
+	AlbumTitle  string  `json:"albumTitle"`
+	Artist      string  `json:"artist"`
+	ReleaseYear string  `json:"releaseYear"`
+	Tracks      []Track `json:"tracks"`
 }
 
-type Articles []Article
+type Track struct {
+	TrackTitle      string `json:"trackTitle"`
+	DurationSeconds int    `json:"durationSeconds"`
+}
 
-func allArticles(w http.ResponseWriter, r *http.Request) {
-	articles := Articles{
-		Article{Title: "Test Title", Desc: "Test Description", Content: "Hello World"},
+func getAlbums(w http.ResponseWriter, r *http.Request) {
+
+	Albums := []Album{
+		Album{
+			AlbumTitle:  "City of Evil",
+			Artist:      "Avenged Sevenfold",
+			ReleaseYear: "2005",
+			Tracks: []Track{
+				{
+					TrackTitle:      "Beast and the Harlot",
+					DurationSeconds: 344,
+				},
+				{
+					TrackTitle:      "Burn it Down",
+					DurationSeconds: 299,
+				},
+			},
+		},
+		{
+			AlbumTitle:  "Emperor of Sand",
+			Artist:      "Mastodon",
+			ReleaseYear: "2017",
+			Tracks: []Track{
+				{
+					TrackTitle:      "Sultan's Curse",
+					DurationSeconds: 250,
+				},
+				{
+					TrackTitle:      "Show Yourself",
+					DurationSeconds: 183,
+				},
+			},
+		},
 	}
 
-	fmt.Println("Endpoint Hit: All Articles Endpoint")
-	json.NewEncoder(w).Encode(articles)
+	fmt.Println("Endpoint Hit: Get Albums Endpoint")
+	json.NewEncoder(w).Encode(Albums)
 }
 
-func testPostArticles(w http.ResponseWriter, r *http.Request) {
+func getTest(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Endpoint Hit: Get Test Endpoint")
+}
+
+func testPostAlbums(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Test POST endpoint worked")
 }
 
@@ -39,8 +77,9 @@ func handleRequests() {
 	myRouter := mux.NewRouter().StrictSlash(true)
 
 	myRouter.HandleFunc("/", homePage)
-	myRouter.HandleFunc("/articles", allArticles).Methods("GET")
-	myRouter.HandleFunc("/articles", testPostArticles).Methods("POST")
+	myRouter.HandleFunc("/albums", getAlbums).Methods("GET")
+	myRouter.HandleFunc("/test", getTest).Methods("GET")
+	myRouter.HandleFunc("/albums", testPostAlbums).Methods("POST")
 	log.Fatal(http.ListenAndServe(":8081", myRouter))
 }
 
