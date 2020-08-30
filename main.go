@@ -1,12 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Album struct {
@@ -21,47 +27,76 @@ type Track struct {
 	DurationSeconds int    `json:"durationSeconds"`
 }
 
-func getAlbums(w http.ResponseWriter, r *http.Request) {
+var client *mongo.Client
 
-	Albums := []Album{
-		Album{
-			AlbumTitle:  "City of Evil",
-			Artist:      "Avenged Sevenfold",
-			ReleaseYear: "2005",
-			Tracks: []Track{
-				{
-					TrackTitle:      "Beast and the Harlot",
-					DurationSeconds: 344,
-				},
-				{
-					TrackTitle:      "Burn it Down",
-					DurationSeconds: 299,
-				},
-			},
-		},
-		{
-			AlbumTitle:  "Emperor of Sand",
-			Artist:      "Mastodon",
-			ReleaseYear: "2017",
-			Tracks: []Track{
-				{
-					TrackTitle:      "Sultan's Curse",
-					DurationSeconds: 250,
-				},
-				{
-					TrackTitle:      "Show Yourself",
-					DurationSeconds: 183,
-				},
-			},
-		},
-	}
+func ConnectToDB() {
 
-	fmt.Println("Endpoint Hit: Get Albums Endpoint")
-	json.NewEncoder(w).Encode(Albums)
+	// connect to MongoDB
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+	client, _ = mongo.Connect(ctx, clientOptions)
+	fmt.Println("Connected to MongoDB!")
+
 }
 
-func getTest(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Endpoint Hit: Get Test Endpoint")
+// ErrorResponse : error model.
+type ErrorResponse struct {
+	StatusCode   int    `json:"status"`
+	ErrorMessage string `json:"message"`
+}
+
+// GetError : This is a helper function to prepare the error model.
+func GetError(err error, w http.ResponseWriter) {
+
+	log.Fatal(err.Error())
+	var response = ErrorResponse{
+		ErrorMessage: err.Error(),
+		StatusCode:   http.StatusInternalServerError,
+	}
+
+	message, _ := json.Marshal(response)
+
+	w.WriteHeader(response.StatusCode)
+	w.Write(message)
+}
+
+func getAlbums(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// create albums array
+	var albums []Album
+
+	collection := client.Database("restAPI").Collection("albums")
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+
+	// pass empty filter to get all data
+	cursor, err := collection.Find(ctx, bson.D{})
+
+	if err != nil {
+		GetError(err, w)
+		return
+	}
+
+	// close cursor once finished
+	defer cursor.Close(context.TODO())
+
+	for cursor.Next(context.TODO()) {
+		var album Album
+
+		err := cursor.Decode(&album)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// add album to our array
+		albums = append(albums, album)
+	}
+
+	if err := cursor.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	json.NewEncoder(w).Encode(albums)
 }
 
 func testPostAlbums(w http.ResponseWriter, r *http.Request) {
@@ -72,17 +107,16 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Homepage Endpoint Hit")
 }
 
-func handleRequests() {
-
-	myRouter := mux.NewRouter().StrictSlash(true)
-
-	myRouter.HandleFunc("/", homePage)
-	myRouter.HandleFunc("/albums", getAlbums).Methods("GET")
-	myRouter.HandleFunc("/test", getTest).Methods("GET")
-	myRouter.HandleFunc("/albums", testPostAlbums).Methods("POST")
-	log.Fatal(http.ListenAndServe(":8081", myRouter))
-}
-
 func main() {
-	handleRequests()
+
+	fmt.Println("Connecting to DB")
+	ConnectToDB()
+
+	r := mux.NewRouter().StrictSlash(true)
+
+	r.HandleFunc("/", homePage)
+	r.HandleFunc("/albums", getAlbums).Methods("GET")
+	r.HandleFunc("/albums", testPostAlbums).Methods("POST")
+
+	log.Fatal(http.ListenAndServe(":8081", r))
 }
