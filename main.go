@@ -14,15 +14,17 @@ import (
 	"github.com/gorilla/mux"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Album struct {
-	AlbumTitle  string  `json:"albumTitle"`
-	Artist      string  `json:"artist"`
-	ReleaseYear string  `json:"releaseYear"`
-	Tracks      []Track `json:"tracks"`
+	ID          primitive.ObjectID `bson:"_id,omitempty"`
+	AlbumTitle  string             `json:"albumTitle"`
+	Artist      string             `json:"artist"`
+	ReleaseYear string             `json:"releaseYear"`
+	Tracks      []Track            `json:"tracks"`
 }
 
 type Track struct {
@@ -31,8 +33,9 @@ type Track struct {
 }
 
 type User struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	ID       primitive.ObjectID `bson:"_id,omitempty"`
+	Email    string             `json:"email"`
+	Password string             `json:"password"`
 }
 
 var client *mongo.Client
@@ -238,7 +241,8 @@ func createAlbums(w http.ResponseWriter, r *http.Request) {
 	var albums []interface{}
 	err := json.NewDecoder(r.Body).Decode(&albums)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("Unable to parse album data")
+		w.WriteHeader(500)
 		return
 	}
 
@@ -248,13 +252,78 @@ func createAlbums(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// insert albums
-	collection.InsertMany(ctx, albums)
+	_, err = collection.InsertMany(ctx, albums)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("Unable to insert album data")
+		w.WriteHeader(500)
 		return
 	}
 
 	fmt.Fprintf(w, "Albums created! %+v", albums)
+}
+
+func updateAlbum(w http.ResponseWriter, r *http.Request) {
+	// get updated album info from request body
+	var album interface{}
+	err := json.NewDecoder(r.Body).Decode(&album)
+	if err != nil {
+		log.Printf("Unable to parse album data")
+		w.WriteHeader(500)
+		return
+	}
+
+	// get album id from header
+	vars := mux.Vars(r)
+	key := vars["id"]
+
+	id, _ := primitive.ObjectIDFromHex(key)
+
+	// connect to albums collection
+	collection := client.Database("restAPI").Collection("albums")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// update album
+	_, err = collection.UpdateOne(
+		ctx,
+		bson.M{"_id": id},
+		bson.D{{"$set", album}},
+	)
+
+	if err != nil {
+		log.Printf("Unable to update album data")
+		w.WriteHeader(500)
+		return
+	}
+
+	fmt.Fprintf(w, "Album updated!")
+}
+
+func deleteAlbum(w http.ResponseWriter, r *http.Request) {
+	// get album id from header
+	vars := mux.Vars(r)
+	key := vars["id"]
+
+	id, _ := primitive.ObjectIDFromHex(key)
+
+	// connect to albums collection
+	collection := client.Database("restAPI").Collection("albums")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// update album
+	_, err := collection.DeleteOne(
+		ctx,
+		bson.M{"_id": id},
+	)
+
+	if err != nil {
+		log.Printf("Unable to delete album data")
+		w.WriteHeader(500)
+		return
+	}
+
+	fmt.Fprintf(w, "Album deleted!")
 }
 
 func main() {
@@ -270,6 +339,8 @@ func main() {
 	r.HandleFunc("/users/login", loginUser).Methods("POST")
 	r.HandleFunc("/albums", getAlbums).Methods("GET")
 	r.HandleFunc("/albums", createAlbums).Methods("POST")
+	r.HandleFunc("/albums/{id}", updateAlbum).Methods("PUT")
+	r.HandleFunc("/albums/{id}", deleteAlbum).Methods("DELETE")
 
 	log.Fatal(http.ListenAndServe(":8081", r))
 }
