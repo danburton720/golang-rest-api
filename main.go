@@ -49,27 +49,6 @@ func ConnectToDB() {
 	fmt.Println("Connected to MongoDB!")
 }
 
-// ErrorResponse : error model.
-type ErrorResponse struct {
-	StatusCode   int    `json:"status"`
-	ErrorMessage string `json:"message"`
-}
-
-// GetError : This is a function to prepare the error model.
-func GetError(err error, w http.ResponseWriter) {
-
-	log.Fatal(err.Error())
-	var response = ErrorResponse{
-		ErrorMessage: err.Error(),
-		StatusCode:   http.StatusInternalServerError,
-	}
-
-	message, _ := json.Marshal(response)
-
-	w.WriteHeader(response.StatusCode)
-	w.Write(message)
-}
-
 func getAlbums(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -84,7 +63,9 @@ func getAlbums(w http.ResponseWriter, r *http.Request) {
 	cursor, err := collection.Find(ctx, bson.D{})
 
 	if err != nil {
-		GetError(err, w)
+		w.WriteHeader(500)
+		log.Printf("Bad request")
+		w.WriteHeader(500)
 		return
 	}
 
@@ -96,7 +77,9 @@ func getAlbums(w http.ResponseWriter, r *http.Request) {
 
 		err := cursor.Decode(&album)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Bad request")
+			w.WriteHeader(500)
+			return
 		}
 
 		// add album to our array
@@ -104,7 +87,10 @@ func getAlbums(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := cursor.Err(); err != nil {
-		log.Fatal(err)
+		w.WriteHeader(500)
+		log.Printf("Bad request")
+		w.WriteHeader(500)
+		return
 	}
 
 	json.NewEncoder(w).Encode(albums)
@@ -117,6 +103,7 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Bad request")
 		w.WriteHeader(500)
+		return
 	}
 
 	// connect to users collection
@@ -125,7 +112,7 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// insert user
-	collection.InsertOne(ctx, bson.D{
+	_, err = collection.InsertOne(ctx, bson.D{
 		{"email", user.Email},
 		{"password", user.Password},
 	})
@@ -159,7 +146,8 @@ func getUsers(w http.ResponseWriter, r *http.Request) {
 	cursor, err := collection.Find(ctx, bson.D{})
 
 	if err != nil {
-		GetError(err, w)
+		log.Printf("Bad request")
+		w.WriteHeader(500)
 		return
 	}
 
@@ -179,7 +167,9 @@ func getUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := cursor.Err(); err != nil {
-		log.Fatal(err)
+		log.Printf("Bad request")
+		w.WriteHeader(500)
+		return
 	}
 
 	json.NewEncoder(w).Encode(users)
@@ -232,7 +222,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "User is a match! %+v", dbUser)
+	fmt.Fprintf(w, "User is a match!")
 
 }
 
