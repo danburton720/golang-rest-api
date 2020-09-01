@@ -8,12 +8,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func getAlbums(w http.ResponseWriter, r *http.Request) {
+func GetAlbums(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// create albums array
@@ -60,7 +61,7 @@ func getAlbums(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(albums)
 }
 
-func createUser(w http.ResponseWriter, r *http.Request) {
+func CreateUser(w http.ResponseWriter, r *http.Request) {
 	// get email and password from request body
 	var user User
 	err := json.NewDecoder(r.Body).Decode(&user)
@@ -92,11 +93,11 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func homePage(w http.ResponseWriter, r *http.Request) {
+func HomePage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Homepage Endpoint Hit")
 }
 
-func getUsers(w http.ResponseWriter, r *http.Request) {
+func GetUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// create users array
@@ -139,7 +140,7 @@ func getUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(users)
 }
 
-func loginUser(w http.ResponseWriter, r *http.Request) {
+func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	// get email and password from request body
 	var user User
@@ -186,11 +187,37 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "User is a match!")
+	type TokenClaims struct {
+		ID    primitive.ObjectID `bson:"_id,omitempty"`
+		Email string             `json:"Email"`
+		jwt.StandardClaims
+	}
 
+	expiresAt := time.Now().Add(time.Minute * 100000).Unix()
+
+	claims := TokenClaims{
+		user.ID,
+		user.Email,
+		jwt.StandardClaims{
+			ExpiresAt: expiresAt,
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.GetSigningMethod("HS256"), claims)
+
+	tokenString, error := token.SignedString([]byte("DAN_GOLANG_REST_API"))
+	if error != nil {
+		fmt.Println(error)
+	}
+
+	var resp = map[string]interface{}{"status": false, "message": "logged in"}
+	resp["token"] = tokenString //Store the token in the response
+	resp["user"] = user
+
+	json.NewEncoder(w).Encode(resp)
 }
 
-func createAlbums(w http.ResponseWriter, r *http.Request) {
+func CreateAlbums(w http.ResponseWriter, r *http.Request) {
 	// get array of albums from request body
 	var albums []interface{}
 	err := json.NewDecoder(r.Body).Decode(&albums)
@@ -216,7 +243,7 @@ func createAlbums(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Albums created! %+v", albums)
 }
 
-func updateAlbum(w http.ResponseWriter, r *http.Request) {
+func UpdateAlbum(w http.ResponseWriter, r *http.Request) {
 	// get updated album info from request body
 	var album interface{}
 	err := json.NewDecoder(r.Body).Decode(&album)
@@ -238,13 +265,13 @@ func updateAlbum(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// update album
-	_, err = collection.UpdateOne(
+	errNoDocuments := collection.FindOneAndUpdate(
 		ctx,
 		bson.M{"_id": id},
 		bson.D{{"$set", album}},
 	)
 
-	if err != nil {
+	if errNoDocuments != nil {
 		log.Printf("Unable to update album data")
 		w.WriteHeader(500)
 		return
@@ -253,7 +280,7 @@ func updateAlbum(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Album updated!")
 }
 
-func deleteAlbum(w http.ResponseWriter, r *http.Request) {
+func DeleteAlbum(w http.ResponseWriter, r *http.Request) {
 	// get album id from header
 	vars := mux.Vars(r)
 	key := vars["id"]

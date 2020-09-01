@@ -11,10 +11,12 @@ run powershell script, e.g. /Users/<user>/mongodb/bin/mongod.exe --dbpath=/Users
 
 Go API runs in localhost on port 8081 - use 'go *.go' to start
 
+Bearer token required to hit /auth endpoints e.g. /users and /albums and /albums/{id}
+This can be retrieved when logging in i.e. /users/login endpoint passing user name and password
+
 ## current restrictions / TODO:
 * passwords stored as plaintext (need to hash before storing)
-* middleware set up for JWT authentication but currently not utilised (WIP)
-* user can "login" but as JWT authentication not complete, this doesn't actually do anything (you can still access the other endpoints)
+* middleware is a bit ropey if no bearer token is supplied - index out of range error
+* login currently returns back user credentials
 * use more "bad request" responses rather than fatal errors
 * custom errors to be implemented better in general
-* refactor and split code into multiple files rather than all in one main.go
