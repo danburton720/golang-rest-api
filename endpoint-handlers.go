@@ -71,6 +71,9 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// hash the password before storing on the DB
+	hashedPW := HashAndSalt([]byte(user.Password))
+
 	// connect to users collection
 	collection := client.Database("restAPI").Collection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -79,7 +82,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	// insert user
 	_, err = collection.InsertOne(ctx, bson.D{
 		{"email", user.Email},
-		{"password", user.Password},
+		{"password", hashedPW},
 	})
 
 	if err != nil {
@@ -178,7 +181,8 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isMatch := (user.Email == dbUser.Email && user.Password == dbUser.Password)
+	// compare password passed in with the hash stored on the DB
+	isMatch := (ComparePasswords(dbUser.Password, []byte(user.Password)))
 
 	if !isMatch {
 		// user not matched

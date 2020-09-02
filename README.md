@@ -3,9 +3,10 @@
 ## requires
 * go,
 * go.mongodb.org/mongo-driver 
-* github.com/gorilla/mux, 
+* github.com/gorilla/mux
 * github.com/dgrijalva/jwt-go
 * github.com/joho/godotenv
+* golang.org/x/crypto/bcrypt
 
 mongoDB runs in local host port 27017
 run powershell script, e.g. /Users/<user>/mongodb/bin/mongod.exe --dbpath=/Users/<user>/mongodb-data
@@ -19,3 +20,4 @@ This can be retrieved when logging in i.e. /users/login endpoint passing user na
 * passwords stored as plaintext (need to hash before storing)
 * use more "bad request" responses rather than fatal errors
 * custom errors to be implemented better in general
+* object ids from mongo should be returned with collection representations
