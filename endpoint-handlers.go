@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -28,9 +27,8 @@ func GetAlbums(w http.ResponseWriter, r *http.Request) {
 	cursor, err := collection.Find(ctx, bson.D{})
 
 	if err != nil {
-		w.WriteHeader(500)
-		log.Printf("Bad request")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "Unable to get albums")
 		return
 	}
 
@@ -42,8 +40,8 @@ func GetAlbums(w http.ResponseWriter, r *http.Request) {
 
 		err := cursor.Decode(&album)
 		if err != nil {
-			log.Printf("Bad request")
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "Unable to get albums")
 			return
 		}
 
@@ -52,9 +50,8 @@ func GetAlbums(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := cursor.Err(); err != nil {
-		w.WriteHeader(500)
-		log.Printf("Bad request")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Unable to get albums")
 		return
 	}
 
@@ -66,8 +63,8 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	var user User
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		log.Printf("Bad request")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Unable to create user")
 		return
 	}
 
@@ -87,8 +84,8 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		// user not created
-		log.Printf("Bad request")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Unable to create user")
 		return
 	}
 
@@ -114,8 +111,8 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	cursor, err := collection.Find(ctx, bson.D{})
 
 	if err != nil {
-		log.Printf("Bad request")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "Unable to get users")
 		return
 	}
 
@@ -127,7 +124,9 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 
 		err := cursor.Decode(&user)
 		if err != nil {
-			log.Fatal(err)
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(w, "Unable to get users")
+			return
 		}
 
 		// add album to our array
@@ -135,8 +134,8 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := cursor.Err(); err != nil {
-		log.Printf("Bad request")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "Unable to get users")
 		return
 	}
 
@@ -149,8 +148,8 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	var user User
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		log.Printf("Unable to authenticate")
-		w.WriteHeader(401)
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprintf(w, "Unable to authenticate")
 		return
 	}
 
@@ -169,15 +168,15 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	filter := bson.D{{"email", user.Email}}
 	if err = collection.FindOne(ctx, filter).Decode(&dbUser); err != nil {
 		// user not found or issue finding user
-		log.Printf("Unable to authenticate")
-		w.WriteHeader(401)
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprintf(w, "Unable to authenticate")
 		return
 	}
 
 	if dbUser.Email == "" {
 		// user not found
-		log.Printf("Unable to authenticate")
-		w.WriteHeader(401)
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprintf(w, "Unable to authenticate")
 		return
 	}
 
@@ -186,8 +185,8 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	if !isMatch {
 		// user not matched
-		log.Printf("Unable to authenticate")
-		w.WriteHeader(401)
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprintf(w, "Unable to authenticate")
 		return
 	}
 
@@ -195,7 +194,6 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	claims := TokenClaims{
 		user.ID,
-		user.Email,
 		jwt.StandardClaims{
 			ExpiresAt: expiresAt,
 		},
@@ -220,8 +218,8 @@ func CreateAlbums(w http.ResponseWriter, r *http.Request) {
 	var albums []interface{}
 	err := json.NewDecoder(r.Body).Decode(&albums)
 	if err != nil {
-		log.Printf("Unable to parse album data")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Unable to parse album data")
 		return
 	}
 
@@ -233,8 +231,8 @@ func CreateAlbums(w http.ResponseWriter, r *http.Request) {
 	// insert albums
 	_, err = collection.InsertMany(ctx, albums)
 	if err != nil {
-		log.Printf("Unable to insert album data")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Unable to insert album data")
 		return
 	}
 
@@ -246,8 +244,8 @@ func UpdateAlbum(w http.ResponseWriter, r *http.Request) {
 	var album interface{}
 	err := json.NewDecoder(r.Body).Decode(&album)
 	if err != nil {
-		log.Printf("Unable to parse album data")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Unable to parse album data")
 		return
 	}
 
@@ -262,20 +260,32 @@ func UpdateAlbum(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// find album - abort if not found and return error
+	var albumTemp Album
+	filter := bson.D{{"_id", id}}
+	err = collection.FindOne(ctx, filter).Decode(&albumTemp)
+	if err != nil {
+		// album not found
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "Unable to find album data")
+		return
+	}
+
 	// update album
-	errNoDocuments := collection.FindOneAndUpdate(
+	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": id},
 		bson.D{{"$set", album}},
 	)
 
-	if errNoDocuments != nil {
-		log.Printf("Unable to update album data")
-		w.WriteHeader(500)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Unable to update album data")
 		return
+	} else {
+		fmt.Fprintf(w, "Album updated!")
 	}
 
-	fmt.Fprintf(w, "Album updated!")
 }
 
 func DeleteAlbum(w http.ResponseWriter, r *http.Request) {
@@ -290,15 +300,26 @@ func DeleteAlbum(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// find album - abort if not found and return error
+	var albumTemp Album
+	filter := bson.D{{"_id", id}}
+	err := collection.FindOne(ctx, filter).Decode(&albumTemp)
+	if err != nil {
+		// album not found
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "Unable to find album data")
+		return
+	}
+
 	// update album
-	_, err := collection.DeleteOne(
+	_, err = collection.DeleteOne(
 		ctx,
 		bson.M{"_id": id},
 	)
 
 	if err != nil {
-		log.Printf("Unable to delete album data")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Unable to delete album data")
 		return
 	}
 

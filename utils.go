@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -39,8 +38,6 @@ func HashAndSalt(pwd []byte) string {
 func ComparePasswords(hashedPwd string, plainPwd []byte) bool {
 	// Since we'll be getting the hashed password from the DB it will be a string so we'll need to convert it to a byte slice
 	byteHash := []byte(hashedPwd)
-	fmt.Println(string(byteHash))
-	fmt.Println(string(plainPwd))
 	err := bcrypt.CompareHashAndPassword(byteHash, plainPwd)
 	if err != nil {
 		log.Println(err)
