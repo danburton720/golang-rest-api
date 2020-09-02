@@ -187,12 +187,6 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type TokenClaims struct {
-		ID    primitive.ObjectID `bson:"_id,omitempty"`
-		Email string             `json:"Email"`
-		jwt.StandardClaims
-	}
-
 	expiresAt := time.Now().Add(time.Minute * 100000).Unix()
 
 	claims := TokenClaims{
@@ -205,14 +199,14 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	token := jwt.NewWithClaims(jwt.GetSigningMethod("HS256"), claims)
 
-	tokenString, error := token.SignedString([]byte("DAN_GOLANG_REST_API"))
+	tokenString, error := token.SignedString([]byte(goDotEnvVariable("SECRET_KEY")))
 	if error != nil {
 		fmt.Println(error)
 	}
 
-	var resp = map[string]interface{}{"status": false, "message": "logged in"}
+	var resp = map[string]interface{}{"message": "logged in"}
 	resp["token"] = tokenString //Store the token in the response
-	resp["user"] = user
+	resp["user"] = user.Email
 
 	json.NewEncoder(w).Encode(resp)
 }

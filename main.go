@@ -30,5 +30,5 @@ func main() {
 	s.HandleFunc("/albums/{id}", UpdateAlbum).Methods("PUT")
 	s.HandleFunc("/albums/{id}", DeleteAlbum).Methods("DELETE")
 
-	log.Fatal(http.ListenAndServe(":8081", r))
+	log.Fatal(http.ListenAndServe(goDotEnvVariable("PORT"), r))
 }

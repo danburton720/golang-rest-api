@@ -5,6 +5,7 @@
 * go.mongodb.org/mongo-driver 
 * github.com/gorilla/mux, 
 * github.com/dgrijalva/jwt-go
+* github.com/joho/godotenv
 
 mongoDB runs in local host port 27017
 run powershell script, e.g. /Users/<user>/mongodb/bin/mongod.exe --dbpath=/Users/<user>/mongodb-data
@@ -16,7 +17,5 @@ This can be retrieved when logging in i.e. /users/login endpoint passing user na
 
 ## current restrictions / TODO:
 * passwords stored as plaintext (need to hash before storing)
-* middleware is a bit ropey if no bearer token is supplied - index out of range error
-* login currently returns back user credentials
 * use more "bad request" responses rather than fatal errors
 * custom errors to be implemented better in general

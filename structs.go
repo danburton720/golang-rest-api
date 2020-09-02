@@ -1,6 +1,9 @@
 package main
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
+import (
+	"github.com/dgrijalva/jwt-go"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type Album struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty"`
@@ -19,4 +22,10 @@ type User struct {
 	ID       primitive.ObjectID `bson:"_id,omitempty"`
 	Email    string             `json:"email"`
 	Password string             `json:"password"`
+}
+
+type TokenClaims struct {
+	ID    primitive.ObjectID `bson:"_id,omitempty"`
+	Email string             `json:"Email"`
+	jwt.StandardClaims
 }
